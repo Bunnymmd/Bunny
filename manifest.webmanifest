@@ -1,0 +1,20 @@
+{
+  "name": "Bunny Desktop",
+  "short_name": "Bunny",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "https://console.bce.baidu.com/api/v1/znzs/user/file/download?fileId=0429b5af-34cb-4022-8e56-20ff69575412.png&src=user",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://saas.chatbot.cn/download/minio/standard/2026-03-14/c1f8b913962240638e7c106625f67813.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
