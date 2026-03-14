@@ -7,10 +7,11 @@
      <meta name="apple-mobile-web-app-capable" content="yes">
      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
      <meta name="apple-mobile-web-app-title" content="Bunny">
-       <link rel="apple-touch-icon" href="https://img.sobot.com/c3d7f65e19e748b28fc7e9f989624633/console/wsRes/ticket/20260314/1768af743e16171c0f95c5258f18faeb/4S5de_1773468269056.png">
-        <link rel="icon" type="image/jpeg" href="https://img.sobot.com/c3d7f65e19e748b28fc7e9f989624633/console/wsRes/ticket/20260314/1768af743e16171c0f95c5258f18faeb/4S5de_1773468269056.png">
      <meta http-equiv="X-Content-Type-Options" content="nosniff">
      <meta name="referrer" content="no-referrer">
+     <!-- 引入持久化库 -->
+     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+     <script src="https://unpkg.com/localforage/dist/localforage.js"></script>
      <link rel="manifest" href="manifest.webmanifest">
      <title>Bunny</title>
 
@@ -146,6 +147,7 @@
 
     .music-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
     .music-controls { display: flex; gap: 12px; align-items: center; }
+    .music-controls svg { width: 18px; height: 18px; fill: var(--text-main); }
     .music-controls svg { width: 18px; height: 18px; fill: var(--text-main); }
     .music-lyrics { font-size: 11px; color: var(--text-light); letter-spacing: 0.5px; }
 
@@ -907,6 +909,37 @@
 
     // 启动数据库并恢复状态
     initDB();
+
+    // =========================================================
+    // --- 新增：Dexie.js & localForage & PWA 注册逻辑 ---
+    // =========================================================
+    
+    // 1. 初始化 Dexie (核心大容量结构化数据)
+    const bunnyDB = new Dexie("BunnyAppDB");
+    bunnyDB.version(1).stores({
+        chatHistory: '++id, roleId, timestamp',
+        characters: 'id, name, avatar',
+        worldBook: 'id, title',
+        masks: 'id, name',
+        album: '++id, category',
+        coupleSpace: 'key, value',
+        wallet: '++id, type, amount'
+    });
+
+    // 2. 初始化 localForage (轻量级配置数据)
+    localforage.config({
+        name: 'BunnySettings',
+        storeName: 'app_configs'
+    });
+
+    // 3. PWA Service Worker 注册 (激活 Edge 安装按钮)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('SW Registered'))
+                .catch(err => console.log('SW Failed', err));
+        });
+    }
 </script>
 
 </body>
