@@ -1,0 +1,913 @@
+﻿<!DOCTYPE html>
+ <html lang="zh-CN">
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+     <meta name="mobile-web-app-capable" content="yes">
+     <meta name="apple-mobile-web-app-capable" content="yes">
+     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+     <meta name="apple-mobile-web-app-title" content="Bunny">
+     <meta http-equiv="X-Content-Type-Options" content="nosniff">
+     <meta name="referrer" content="no-referrer">
+     <link rel="manifest" href="manifest.webmanifest">
+     <title>Bunny</title>
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+    :root {
+        --bg-white: #ffffff;
+        --text-main: #555555;
+        --text-light: #999999;
+        --icon-gray: #7a7a7a;
+        --widget-bg: rgba(255, 255, 255, 0.85);
+        --app-bg: #fdfdfd;
+        --shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        --border-light: rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        background-color: #e0e0e0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+    }
+
+    /* 核心屏幕容器（无外壳） */
+    .screen {
+        width: 100%;
+        max-width: 430px; /* 模拟大屏手机宽度 */
+        height: 100vh;
+        max-height: 932px;
+        background-color: var(--bg-white);
+        /* 满铺浅灰色小爱心暗纹 */
+        background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 25C20 25 14 21 14 16.2C14 13.8 15.6 12.2 18 12.2C19.2 12.2 20 13 20 13C20 13 20.8 12.2 22 12.2C24.4 12.2 26 13.8 26 16.2C26 21 20 25 20 25Z' fill='%23f4f4f4'/%3E%3C/svg%3E");
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* --- 1. 顶部状态栏 --- */
+    .status-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-main);
+        z-index: 10;
+    }
+    .status-left, .status-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    /* 左上角实时时间加粗 */
+    .status-left .real-time {
+        font-weight: 700; 
+    }
+    .icon-signal { width: 16px; height: 14px; fill: var(--icon-gray); }
+    .battery-container {
+        width: 22px; height: 11px;
+        border: 1px solid var(--icon-gray);
+        border-radius: 3px;
+        padding: 1px;
+        position: relative;
+    }
+    .battery-container::after {
+        content: ''; position: absolute;
+        right: -3px; top: 2px; width: 2px; height: 5px;
+        background: var(--icon-gray); border-radius: 0 2px 2px 0;
+    }
+    .battery-level {
+        height: 100%; background: var(--text-main);
+        border-radius: 1px; width: 100%;
+    }
+
+    /* 内容滚动区 */
+    .content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px 20px 100px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .content::-webkit-scrollbar { display: none; }
+
+    /* --- 1. 通栏核心组件：音乐播放器 --- */
+    .music-widget {
+        width: 100%; height: 160px;
+        border-radius: 24px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        color: var(--text-main);
+        display: flex; flex-direction: column; justify-content: space-between;
+        padding: 16px;
+        border: 1px solid var(--border-light);
+        cursor: pointer; /* 增加鼠标指针 */
+    }
+    /* 树枝雪景背景 - 不透明度提高到 0.5 */
+    .music-bg {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background-image: url('https://images.unsplash.com/photo-1478265409131-1f65c88f965c?auto=format&fit=crop&w=600&q=80');
+        background-size: cover; background-position: center;
+        opacity: 0.5; z-index: 1;
+    }
+    .music-widget::before {
+        content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: linear-gradient(to bottom, rgba(255,255,255,0.7), rgba(255,255,255,0.95));
+        z-index: 2;
+    }
+    .music-content { position: relative; z-index: 3; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+    
+    .music-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-light); }
+    .music-top-left { display: flex; align-items: center; gap: 4px; }
+    
+    .music-middle { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: -10px;}
+    .music-nickname { font-size: 13px; font-weight: 500; }
+    /* 加大右上角头像尺寸 */
+    .music-avatar { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; cursor: pointer; }
+
+    .music-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+    .music-controls { display: flex; gap: 12px; align-items: center; }
+    .music-controls svg { width: 18px; height: 18px; fill: var(--text-main); }
+    .music-lyrics { font-size: 11px; color: var(--text-light); letter-spacing: 0.5px; }
+
+    /* 通用分栏布局 */
+    .split-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    /* --- 2. 中上区域 --- */
+    /* 左侧：纯爱心形状且无底图 */
+    .cat-heart-widget {
+        aspect-ratio: 1;
+        background: transparent;
+        border-radius: 0;
+        box-shadow: none;
+        display: flex; justify-content: center; align-items: center;
+        border: none;
+    }
+    .cat-heart-mask {
+        width: 100%; height: 100%;
+        /* 采用纯爱心SVG Mask */
+        -webkit-mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E");
+        -webkit-mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        background-image: url('https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=400&q=80');
+        background-size: cover; background-position: center;
+        cursor: pointer;
+    }
+
+    /* 右侧：2x2 App区 */
+    .app-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 12px;
+    }
+    .app-item {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    }
+    .app-icon {
+        width: 54px; height: 54px;
+        background: var(--app-bg);
+        border-radius: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02), inset 0 0 0 1px rgba(0,0,0,0.03);
+        display: flex; justify-content: center; align-items: center;
+    }
+    .app-icon svg { width: 24px; height: 24px; fill: var(--text-light); }
+    .app-name { font-size: 11px; color: var(--text-light); font-weight: 400; }
+
+    /* --- 3. 中下区域 --- */
+    /* 右列组件区纵向排列 */
+    .widget-stack {
+        display: flex; flex-direction: column; gap: 12px;
+    }
+    .mini-widget {
+        background: rgba(255, 255, 255, 0.5); /* 改为半透明 */
+        border-radius: 18px;
+        padding: 12px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border-light);
+        display: flex; align-items: center;
+        position: relative;
+    }
+    /* 装饰性文字组件 */
+    .text-widget { justify-content: center; font-size: 10px; color: var(--text-light); letter-spacing: 1px; text-align: center;}
+    
+    /* 圆角矩形组件1 */
+    .profile-widget-1 { gap: 10px; }
+    .profile-widget-1 .w-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; cursor: pointer; flex-shrink: 0; }
+    .profile-widget-1 .w-text { font-size: 13px; font-style: italic; color: var(--text-main); }
+    
+    /* 圆角矩形组件2 */
+    .profile-widget-2 { justify-content: space-between; }
+    .w-symbols { font-size: 14px; color: var(--text-main); display: flex; gap: 4px;}
+    .profile-widget-2 .w-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; align-self: center; cursor: pointer; flex-shrink: 0; }
+
+    /* --- 4. 底部导航与Dock栏 --- */
+    .dock {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        height: 76px;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 30px;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        padding: 0 10px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+        border: 1px solid rgba(255,255,255,0.8);
+        z-index: 100;
+    }
+    .dock .app-item .app-name { display: none; } /* Dock栏不显示文字 */
+    .dock .app-icon { background: rgba(255,255,255,0.5); box-shadow: none; border: 1px solid rgba(0,0,0,0.02);}
+
+    /* SVG 图标库 (内联复用) */
+    .svg-defs { display: none; }
+
+    /* --- 跟随点击的极小菜单栏样式 (极致压缩版) --- */
+    .context-menu {
+        position: fixed;
+        background: var(--widget-bg);
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        border: 1px solid var(--border-light);
+        padding: 4px;
+        display: none;
+        flex-direction: column;
+        gap: 2px;
+        width: 86px;
+        z-index: 1000;
+    }
+    .context-menu.active {
+        display: flex;
+    }
+    .menu-btn {
+        width: 100%;
+        padding: 6px 4px;
+        border: none;
+        border-radius: 6px;
+        font-size: 11px;
+        background: transparent;
+        color: var(--text-main);
+        cursor: pointer;
+        text-align: center;
+        transition: 0.2s;
+        font-weight: 500;
+    }
+    .menu-btn:hover { background: rgba(0,0,0,0.04); }
+    .menu-btn:active { background: #eaeaea; }
+
+    /* ========================================= */
+    /* --- 新增：主题页面及内部组件样式 --- */
+    /* ========================================= */
+    .theme-page {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: var(--bg-white); z-index: 200;
+        display: none; flex-direction: column;
+        transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+    .theme-page.active {
+        display: flex; transform: translateX(0);
+    }
+    .theme-header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 20px 24px 12px 24px; font-size: 15px; font-weight: 700;
+        color: var(--text-main); border-bottom: 1px solid var(--border-light);
+        background: rgba(255,255,255,0.9); backdrop-filter: blur(10px);
+    }
+    .theme-back { cursor: pointer; color: var(--text-light); font-size: 13px; font-weight: 500;}
+    .theme-content { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 28px; padding-bottom: 60px;}
+    .theme-content::-webkit-scrollbar { display: none; }
+    
+    .theme-section-title { font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: -12px; padding-left: 6px; border-left: 3px solid var(--text-light); letter-spacing: 0.5px;}
+    
+    /* 虚拟小手机预览壁纸 (全新精致设计) */
+    .virtual-phone-container { display: flex; flex-direction: column; align-items: center; gap: 12px;}
+    .virtual-phone {
+        width: 120px; height: 260px; border-radius: 24px; border: 6px solid #e8e8e8;
+        background-color: #fafafa; background-size: cover; background-position: center;
+        position: relative; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,0.08), inset 0 0 0 1px rgba(0,0,0,0.05);
+        display: flex; flex-direction: column; justify-content: space-between; padding: 12px 8px 8px 8px;
+        transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+        overflow: hidden;
+    }
+    .virtual-phone:active { transform: scale(0.95); }
+    /* 刘海/灵动岛设计 */
+    .virtual-phone::before {
+        content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+        width: 40px; height: 12px; background: #e8e8e8;
+        border-radius: 0 0 8px 8px; z-index: 2;
+    }
+    .vp-time { font-size: 10px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.4); text-align: center; margin-top: 6px; z-index: 3; position: relative;}
+    .vp-dock { height: 20px; background: rgba(255,255,255,0.4); border-radius: 10px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); margin-bottom: 2px; z-index: 3; position: relative; border: 1px solid rgba(255,255,255,0.3);}
+    .vp-hint { font-size: 10px; color: var(--text-light); font-weight: 500;}
+
+    /* 图标网格 */
+    .theme-icons-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 12px;}
+    .ti-item { display: flex; flex-direction: column; align-items: center; gap: 6px;}
+    .ti-icon { 
+        width: 48px; height: 48px; background: var(--app-bg); border-radius: 14px; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; justify-content: center; align-items: center; 
+        cursor: pointer; background-size: cover; background-position: center; border: 1px solid var(--border-light);
+        transition: transform 0.2s;
+    }
+    .ti-icon:active { transform: scale(0.92); }
+    .ti-icon svg { width: 22px; height: 22px; fill: var(--text-light); pointer-events: none;}
+    .ti-name { font-size: 10px; color: var(--text-light); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;}
+
+    /* 字体设置 */
+    .theme-font-setting { display: flex; gap: 10px; }
+    .theme-font-setting input { flex: 1; padding: 10px 14px; border: 1px solid #eaeaea; border-radius: 12px; font-size: 12px; outline: none; background: #fafafa; color: var(--text-main); transition: border 0.2s;}
+    .theme-font-setting input:focus { border-color: #ccc; }
+    .theme-font-setting button { padding: 0 16px; background: var(--text-main); color: #fff; border: none; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: 500; transition: background 0.2s;}
+    .theme-font-setting button:active { background: #333; }
+</style>
+</head>
+<body>
+
+<!-- 定义复用的纯色SVG图标，确保无Emoji且颜色完全受控 -->
+<svg class="svg-defs">
+    <defs>
+        <!-- App Icons -->
+        <path id="ic-diary" d="M6 2h12a2 2 0 012 2v16a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zm2 4v2h8V6H8zm0 4v2h8v-2H8zm0 4v2h6v-2H8z"/>
+        <path id="ic-shop" d="M16 6V4a4 4 0 00-8 0v2H4v14a2 2 0 002 2h12a2 2 0 002-2V6h-4zM10 4a2 2 0 014 0v2h-4V4zm6 4v2a1 1 0 11-2 0V8h-4v2a1 1 0 11-2 0V8H6v12h12V8h-2z"/>
+        <path id="ic-forum" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/>
+        <path id="ic-music" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        <path id="ic-companion" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+        <path id="ic-search" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        <path id="ic-placeholder" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z" stroke-dasharray="4" stroke="var(--text-light)" stroke-width="1" fill="none"/>
+        <path id="ic-couple" d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3z"/>
+        <!-- Dock Icons -->
+        <path id="ic-chat" d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+        <path id="ic-theme" d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+        <path id="ic-world" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+        <path id="ic-settings" d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
+        <!-- Player Controls -->
+        <path id="ic-play" d="M8 5v14l11-7z"/>
+        <path id="ic-skip" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+    </defs>
+</svg>
+
+<div class="screen">
+    <!-- 顶部状态栏 -->
+    <header class="status-bar">
+        <div class="status-left">
+            <span class="real-time">00:00</span>
+        </div>
+        <div class="status-right">
+            <!-- 五根竖线样式的蜂窝网络 -->
+            <svg class="icon-signal" viewBox="0 0 24 24">
+                <rect x="1.5" y="14" width="2.5" height="8" rx="1"/>
+                <rect x="6" y="11" width="2.5" height="11" rx="1"/>
+                <rect x="10.5" y="8" width="2.5" height="14" rx="1"/>
+                <rect x="15" y="5" width="2.5" height="17" rx="1"/>
+                <rect x="19.5" y="2" width="2.5" height="20" rx="1"/>
+            </svg>
+            <!-- 电池 -->
+            <div class="battery-container">
+                <div class="battery-level" id="battery-fill" style="width: 80%;"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主体内容区 -->
+    <div class="content">
+        
+        <!-- 1. 通栏核心组件：全屏宽度模拟音乐播放器，绑定 data-img-key 实现背景更换 -->
+        <div class="music-widget" data-img-key="music-bg-img">
+            <div class="music-bg"></div>
+            <div class="music-content">
+                <div class="music-top">
+                    <div class="music-top-left">
+                        <svg class="icon-signal" viewBox="0 0 24 24" style="width:12px; height:12px;">
+                            <rect x="1.5" y="14" width="2.5" height="8" rx="1"/>
+                            <rect x="6" y="11" width="2.5" height="11" rx="1"/>
+                            <rect x="10.5" y="8" width="2.5" height="14" rx="1"/>
+                            <rect x="15" y="5" width="2.5" height="17" rx="1"/>
+                            <rect x="19.5" y="2" width="2.5" height="20" rx="1"/>
+                        </svg>
+                        <span class="real-time">00:00</span>
+                    </div>
+                    <span>晴</span>
+                </div>
+                <div class="music-middle">
+                    <!-- 绑定 data-text-key 修改文本 -->
+                    <span class="music-nickname" data-text-key="text-nickname" style="cursor: pointer;">兔兔丸</span>
+                    <!-- 绑定 data-img-key 修改图片 -->
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="music-avatar" alt="Avatar" data-img-key="avatar-main">
+                </div>
+                <div class="music-bottom">
+                    <div class="music-controls">
+                        <svg viewBox="0 0 24 24"><use href="#ic-skip" transform="scale(-1, 1) translate(-24, 0)"/></svg>
+                        <svg viewBox="0 0 24 24" style="width:24px; height:24px;"><use href="#ic-play"/></svg>
+                        <svg viewBox="0 0 24 24"><use href="#ic-skip"/></svg>
+                    </div>
+                    <!-- 绑定 data-text-key 修改文本 -->
+                    <div class="music-lyrics" data-text-key="text-lyrics" style="cursor: pointer;">あなたとずっと一緒にいたい𖦹 𖥦×</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 中上区域 -->
+        <div class="split-layout">
+            <div class="cat-heart-widget">
+                <div class="cat-heart-mask" data-img-key="heart-img"></div>
+            </div>
+            
+            <!-- 右侧：2x2 App区 -->
+            <div class="app-grid">
+                <div class="app-item">
+                    <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-diary"/></svg></div>
+                    <span class="app-name">日记</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-shop"/></svg></div>
+                    <span class="app-name">购物</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-forum"/></svg></div>
+                    <span class="app-name">论坛</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-music"/></svg></div>
+                    <span class="app-name">音乐</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 中下区域 -->
+        <div class="split-layout">
+            <!-- 左侧：2x2 App区 -->
+            <div class="app-grid">
+                <div class="app-item">
+                    <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-companion"/></svg></div>
+                    <span class="app-name">陪伴</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-search"/></svg></div>
+                    <span class="app-name">查手机</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-placeholder"/></svg></div>
+                    <span class="app-name">占位</span>
+                </div>
+                <div class="app-item">
+                    <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-couple"/></svg></div>
+                    <span class="app-name">情侣空间</span>
+                </div>
+            </div>
+
+            <!-- 右侧：纵向排列组件区 -->
+            <div class="widget-stack">
+                <!-- 装饰性文字，绑定 data-text-key 修改文本 -->
+                <div class="mini-widget text-widget" data-text-key="text-deco" style="cursor: pointer;">
+                    ⊹♡┈ 𓏴 𝒫𝒾𝓃𝓀 𝒱𝑒𝓁𝓋𝑒𝓉 𓏴 ┈♡⊹
+                </div>
+                <!-- 头像 + 英文 -->
+                <div class="mini-widget profile-widget-1">
+                    <!-- 绑定 data-img-key 修改图片 -->
+                    <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=100&q=80" class="w-avatar" alt="Avatar" data-img-key="avatar-w1">
+                    <!-- 绑定 data-text-key 修改文本 -->
+                    <span class="w-text" data-text-key="text-wtext" style="cursor: pointer;">*愛しています</span>
+                </div>
+                <!-- 符号 + 头像 -->
+                <div class="mini-widget profile-widget-2">
+                    <!-- 绑定 data-text-key 修改文本 -->
+                    <div class="w-symbols" data-text-key="text-symbols" style="cursor: pointer;">⸝⸝ ♪·🖇 ⁺˳꙳✧˖°ﾟ</div>
+                    <!-- 绑定 data-img-key 修改图片 -->
+                    <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=100&q=80" class="w-avatar" alt="Avatar" data-img-key="avatar-w2">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 4. 底部Dock栏 -->
+    <div class="dock">
+        <div class="app-item">
+            <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-chat"/></svg></div>
+            <span class="app-name">Chat</span>
+        </div>
+        <div class="app-item">
+            <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-theme"/></svg></div>
+            <span class="app-name">主题</span>
+        </div>
+        <div class="app-item">
+            <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-world"/></svg></div>
+            <span class="app-name">世界书</span>
+        </div>
+        <div class="app-item">
+            <div class="app-icon"><svg viewBox="0 0 24 24"><use href="#ic-settings"/></svg></div>
+            <span class="app-name">设置</span>
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- 新增：全屏主题页面 (默认隐藏，覆盖在screen之上) -->
+    <!-- ========================================= -->
+    <div class="theme-page" id="theme-page">
+        <div class="theme-header">
+            <span class="theme-back" id="theme-back">❮ 返回</span>
+            <span class="theme-title">主题设置</span>
+            <span style="width:40px;"></span>
+        </div>
+        <div class="theme-content">
+            <!-- 虚拟壁纸手机 -->
+            <div class="theme-section-title">桌面壁纸</div>
+            <div class="virtual-phone-container">
+                <div class="virtual-phone" id="preview-wallpaper">
+                    <div class="vp-time">00:00</div>
+                    <div class="vp-dock"></div>
+                </div>
+                <div class="vp-hint">点击小手机更换壁纸</div>
+            </div>
+
+            <!-- 桌面图标 -->
+            <div class="theme-section-title">桌面图标 (点击更换)</div>
+            <div class="theme-icons-grid" id="theme-icons-grid">
+                <!-- JS 动态生成 12 个图标预览 -->
+            </div>
+
+            <!-- 字体设置 -->
+            <div class="theme-section-title">全局字体</div>
+            <div class="theme-font-setting">
+                <!-- 提示词修改为输入 URL -->
+                <input type="text" id="font-input" placeholder="输入字体文件URL (如 .ttf/.woff)">
+                <button id="btn-apply-font">应用</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- 跟随点击的纯文字极小菜单栏 -->
+<div class="context-menu" id="context-menu">
+    <button class="menu-btn" id="menu-url-btn">输入URL</button>
+    <button class="menu-btn" id="menu-local-btn">本地文件</button>
+</div>
+<input type="file" id="img-file-input" accept="image/*" style="display: none;">
+
+<script>
+    // 实时时间更新 (全局共用)
+    function updateTime() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const timeString = `${hours}:${minutes}`;
+        
+        document.querySelectorAll('.real-time, .vp-time').forEach(el => {
+            el.textContent = timeString;
+        });
+    }
+    
+    // 实时电量模拟/获取
+    function updateBattery() {
+        const batteryFill = document.getElementById('battery-fill');
+        if ('getBattery' in navigator) {
+            navigator.getBattery().then(function(battery) {
+                const level = Math.round(battery.level * 100);
+                batteryFill.style.width = level + '%';
+                battery.addEventListener('levelchange', function() {
+                    batteryFill.style.width = Math.round(battery.level * 100) + '%';
+                });
+            });
+        } else {
+            batteryFill.style.width = '80%';
+        }
+    }
+
+    // 初始化
+    setInterval(updateTime, 1000);
+    updateTime();
+    updateBattery();
+
+    // =========================================================
+    // --- 纯净版 IndexedDB 持久化存储引擎 (无 LocalStorage) ---
+    // =========================================================
+    const dbName = "NekomimiDB_V3"; // 升级版本号，确保强制重建表
+    const storeName = "customData"; 
+    let db = null;
+    let currentEditingImgKey = null;
+
+    const initDB = () => {
+        const request = indexedDB.open(dbName, 1);
+        request.onupgradeneeded = (e) => {
+            db = e.target.result;
+            if (!db.objectStoreNames.contains(storeName)) {
+                db.createObjectStore(storeName);
+            }
+        };
+        request.onsuccess = (e) => {
+            db = e.target.result;
+            loadData(); 
+        };
+        request.onerror = (e) => {
+            console.error("IndexedDB error:", e.target.error);
+        };
+    };
+
+    const saveData = (key, data) => {
+        if (!db) return;
+        try {
+            const tx = db.transaction(storeName, "readwrite");
+            tx.objectStore(storeName).put(data, key);
+        } catch(e) {
+            console.error("IndexedDB save error:", e);
+        }
+    };
+
+    const loadData = () => {
+        if (!db) return;
+        try {
+            const tx = db.transaction(storeName, "readonly");
+            const store = tx.objectStore(storeName);
+            const request = store.openCursor(); // 游标遍历，兼容性最强
+            request.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    dispatchData(cursor.key, cursor.value);
+                    cursor.continue();
+                }
+            };
+        } catch(e) {
+            console.error("IndexedDB load error:", e);
+        }
+    };
+
+    const dispatchData = (key, data) => {
+        if (key.startsWith('text-') || key === 'theme-font-url') {
+            applyDataToElement(key, data, 'text');
+        } else {
+            applyDataToElement(key, data, 'img');
+        }
+    };
+
+    // --- 核心：将数据应用到 DOM 元素 (包含主题扩展逻辑) ---
+    const applyDataToElement = (key, data, type) => {
+        if (type === 'img') {
+            // 扩展1：全局壁纸持久化应用
+            if (key === 'theme-wallpaper') {
+                const screen = document.querySelector('.screen');
+                screen.style.backgroundImage = `url('${data}')`;
+                screen.style.backgroundSize = 'cover';
+                screen.style.backgroundPosition = 'center';
+                const preview = document.getElementById('preview-wallpaper');
+                if (preview) preview.style.backgroundImage = `url('${data}')`;
+                return;
+            }
+            // 扩展2：12个App图标持久化应用
+            if (key.startsWith('icon-')) {
+                const index = parseInt(key.split('-')[1]);
+                const realItems = document.querySelectorAll('.screen > .content .app-item, .screen > .dock .app-item');
+                if (realItems[index]) {
+                    const realIcon = realItems[index].querySelector('.app-icon');
+                    // 覆盖背景图，隐藏原生SVG
+                    realIcon.style.backgroundImage = `url('${data}')`;
+                    realIcon.style.backgroundSize = 'cover';
+                    realIcon.style.backgroundPosition = 'center';
+                    const svg = realIcon.querySelector('svg');
+                    if (svg) svg.style.opacity = '0';
+                }
+                // 同步更新主题页里的预览方块
+                const previewIcon = document.querySelector(`.ti-icon[data-img-key="${key}"]`);
+                if (previewIcon) {
+                    previewIcon.style.backgroundImage = `url('${data}')`;
+                    const pSvg = previewIcon.querySelector('svg');
+                    if (pSvg) pSvg.style.opacity = '0';
+                }
+                return;
+            }
+            // 扩展3：音乐组件背景图持久化应用
+            if (key === 'music-bg-img') {
+                const bgEl = document.querySelector('.music-bg');
+                if (bgEl) bgEl.style.backgroundImage = `url('${data}')`;
+                return;
+            }
+
+            // 原有逻辑：直接通过 data-img-key 绑定的元素
+            const el = document.querySelector(`[data-img-key="${key}"]`);
+            if (!el) return;
+            if (el.tagName.toLowerCase() === 'img') {
+                el.src = data;
+            } else {
+                el.style.backgroundImage = `url('${data}')`;
+            }
+        } else if (type === 'text') {
+            // 扩展4：全局字体URL持久化应用 (@font-face)
+            if (key === 'theme-font-url') {
+                let styleTag = document.getElementById('custom-font-style');
+                if (!styleTag) {
+                    styleTag = document.createElement('style');
+                    styleTag.id = 'custom-font-style';
+                    document.head.appendChild(styleTag);
+                }
+                // 动态注入 @font-face 规则
+                styleTag.innerHTML = `
+                    @font-face {
+                        font-family: 'CustomUserFont';
+                        src: url('${data}');
+                    }
+                    * { font-family: 'CustomUserFont', 'Noto Sans SC', -apple-system, sans-serif !important; }
+                `;
+                const fontInput = document.getElementById('font-input');
+                if (fontInput) fontInput.value = data;
+                return;
+            }
+
+            // 原有逻辑：文本修改
+            const el = document.querySelector(`[data-text-key="${key}"]`);
+            if (!el) return;
+            el.textContent = data;
+        }
+    };
+
+    // --- 文本修改交互 ---
+    document.querySelectorAll('[data-text-key]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = el.getAttribute('data-text-key');
+            const currentText = el.textContent;
+            const newText = prompt('修改文案:', currentText);
+            if (newText !== null && newText.trim() !== '') {
+                applyDataToElement(key, newText, 'text');
+                saveData(key, newText);
+            }
+        });
+    });
+
+    // --- 抽取菜单显示逻辑 ---
+    const contextMenu = document.getElementById('context-menu');
+    const showContextMenu = (e, key) => {
+        e.stopPropagation();
+        currentEditingImgKey = key;
+        
+        let x = e.clientX;
+        let y = e.clientY;
+        const menuWidth = 86;
+        const menuHeight = 52; 
+        if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
+        if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
+        
+        contextMenu.style.left = x + 'px';
+        contextMenu.style.top = y + 'px';
+        contextMenu.classList.add('active');
+    };
+
+    // 绑定原有的图片组件点击 (包含新增的音乐背景)
+    document.querySelectorAll('[data-img-key]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            showContextMenu(e, el.getAttribute('data-img-key'));
+        });
+    });
+
+    // 点击页面空白处关闭菜单
+    document.addEventListener('click', (e) => {
+        if (!contextMenu.contains(e.target)) {
+            contextMenu.classList.remove('active');
+        }
+    });
+
+    // 菜单按钮交互
+    const menuUrlBtn = document.getElementById('menu-url-btn');
+    const menuLocalBtn = document.getElementById('menu-local-btn');
+    const fileInput = document.getElementById('img-file-input');
+
+    menuUrlBtn.addEventListener('click', () => {
+        contextMenu.classList.remove('active');
+        if (currentEditingImgKey) {
+            const url = prompt('请输入图片URL:');
+            if (url && url.trim() !== '') {
+                applyDataToElement(currentEditingImgKey, url.trim(), 'img');
+                saveData(currentEditingImgKey, url.trim());
+            }
+        }
+    });
+
+    menuLocalBtn.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file || !currentEditingImgKey) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64 = event.target.result;
+            applyDataToElement(currentEditingImgKey, base64, 'img');
+            saveData(currentEditingImgKey, base64);
+            contextMenu.classList.remove('active');
+        };
+        reader.readAsDataURL(file);
+        fileInput.value = ''; 
+    });
+
+
+    // =========================================
+    // --- 新增：主题页面控制与渲染逻辑 ---
+    // =========================================
+    const themePage = document.getElementById('theme-page');
+    let isThemeRendered = false;
+
+    // 拦截“主题”按钮点击 (通过文字内容匹配，避免修改原HTML结构)
+    document.querySelectorAll('.app-item').forEach(item => {
+        const nameEl = item.querySelector('.app-name');
+        if (nameEl && nameEl.textContent === '主题') {
+            item.addEventListener('click', () => {
+                themePage.classList.add('active');
+                renderThemeIcons();
+            });
+        }
+    });
+
+    // 关闭主题页
+    document.getElementById('theme-back').addEventListener('click', () => {
+        themePage.classList.remove('active');
+    });
+
+    // 动态渲染 12 个图标预览
+    function renderThemeIcons() {
+        if (isThemeRendered) return;
+        const grid = document.getElementById('theme-icons-grid');
+        // 获取真实的12个App (内容区8个 + Dock栏4个)
+        const realItems = document.querySelectorAll('.screen > .content .app-item, .screen > .dock .app-item');
+        
+        realItems.forEach((item, index) => {
+            const name = item.querySelector('.app-name').textContent;
+            const svgHtml = item.querySelector('.app-icon').innerHTML;
+            
+            const tiItem = document.createElement('div');
+            tiItem.className = 'ti-item';
+            
+            const tiIcon = document.createElement('div');
+            tiIcon.className = 'ti-icon';
+            tiIcon.innerHTML = svgHtml;
+            tiIcon.setAttribute('data-img-key', `icon-${index}`); // 分配固定Key
+            
+            const tiName = document.createElement('div');
+            tiName.className = 'ti-name';
+            tiName.textContent = name;
+
+            tiItem.appendChild(tiIcon);
+            tiItem.appendChild(tiName);
+            grid.appendChild(tiItem);
+
+            // 绑定点击更换菜单
+            tiIcon.addEventListener('click', (e) => {
+                showContextMenu(e, `icon-${index}`);
+            });
+        });
+
+        // 绑定虚拟壁纸小手机点击
+        document.getElementById('preview-wallpaper').addEventListener('click', (e) => {
+            showContextMenu(e, 'theme-wallpaper');
+        });
+
+        isThemeRendered = true;
+        // 重新触发一次加载，把刚生成的DOM涂上保存的持久化图片
+        loadData(); 
+    }
+
+    // 字体URL应用按钮
+    document.getElementById('btn-apply-font').addEventListener('click', () => {
+        const fontUrl = document.getElementById('font-input').value.trim();
+        if (fontUrl) {
+            applyDataToElement('theme-font-url', fontUrl, 'text');
+            saveData('theme-font-url', fontUrl);
+        }
+    });
+
+    // 启动数据库并恢复状态
+    initDB();
+</script>
+
+</body>
+</html>
+
+
