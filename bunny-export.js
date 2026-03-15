@@ -9,25 +9,23 @@
         return `Bunny_${year}-${month}-${day}.json`;
     }
 
-    // 核心：替换导出按钮逻辑的函数
+    // 核心：替换导出按钮逻辑，修复顺序问题
     function replaceExportLogic() {
         const oldBtn = document.getElementById('btn-export-data');
         if (!oldBtn) return false;
 
-        // 彻底删除原按钮，销毁所有原生绑定事件
-        const parent = oldBtn.parentElement;
-        oldBtn.remove();
-
-        // 新建和原按钮完全一致的新按钮，插入到原来的位置
+        // 新建和原按钮完全一致的新按钮
         const newBtn = document.createElement('button');
         newBtn.id = 'btn-export-data';
         newBtn.className = 'settings-btn';
         newBtn.textContent = '导出数据';
-        parent.appendChild(newBtn);
 
-        // 给新按钮绑定我们的专属导出逻辑
+        // 关键修复：把新按钮插入到原按钮的前面，再删除原按钮，保持顺序完全不变
+        oldBtn.parentNode.insertBefore(newBtn, oldBtn);
+        oldBtn.remove();
+
+        // 给新按钮绑定完整的导出逻辑
         newBtn.addEventListener('click', async function() {
-            // 重复点击拦截
             if (this.hasAttribute('data-download-url')) return;
             
             const originalText = this.textContent;
@@ -119,14 +117,14 @@
         return true;
     }
 
-    // 双重兜底：页面加载完成后执行，同时开启DOM监听，确保按钮出现后立即替换
+    // 双重兜底：页面加载完成后执行，同时开启DOM监听
     const observer = new MutationObserver(() => {
         if (replaceExportLogic()) {
-            observer.disconnect(); // 替换成功后停止监听
+            observer.disconnect();
         }
     });
 
-    // 等页面所有资源、JS执行完成后再运行，彻底规避时序问题
+    // 等页面所有资源加载完成后运行，彻底规避时序问题
     window.addEventListener('load', () => {
         if (!replaceExportLogic()) {
             observer.observe(document.body, { childList: true, subtree: true });
