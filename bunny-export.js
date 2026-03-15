@@ -1,6 +1,6 @@
 (function() {
-    // 文件名格式化函数
-    function formatBunnyExportFileName() {
+    // 文件名格式化函数：固定 Bunny_年-月-日 格式
+    function formatBunnyFileName() {
         const padZero = (num) => String(num).padStart(2, '0');
         const now = new Date();
         const year = now.getFullYear();
@@ -14,20 +14,22 @@
         const oldBtn = document.getElementById('btn-export-data');
         if (!oldBtn) return false;
 
-        // 彻底删除原按钮，销毁所有原生事件
+        // 彻底删除原按钮，销毁所有原生绑定事件
         const parent = oldBtn.parentElement;
         oldBtn.remove();
 
-        // 新建完全一致的按钮，插入原位置
+        // 新建和原按钮完全一致的新按钮，插入到原来的位置
         const newBtn = document.createElement('button');
         newBtn.id = 'btn-export-data';
         newBtn.className = 'settings-btn';
         newBtn.textContent = '导出数据';
         parent.appendChild(newBtn);
 
-        // 绑定新的导出逻辑
+        // 给新按钮绑定我们的专属导出逻辑
         newBtn.addEventListener('click', async function() {
+            // 重复点击拦截
             if (this.hasAttribute('data-download-url')) return;
+            
             const originalText = this.textContent;
             this.textContent = '数据打包中，请稍候...';
             this.disabled = true;
@@ -35,18 +37,27 @@
             await new Promise(resolve => setTimeout(resolve, 100));
 
             try {
+                // 全量数据打包，和原代码100%一致，导入完全兼容
                 const exportData = { dexie: {}, localforage: {}, localstorage: {}, customDB: [] };
+                
+                // 读取Dexie核心数据
                 for (const table of bunnyDB.tables) {
                     exportData.dexie[table.name] = await table.toArray();
                 }
+
+                // 读取localforage配置数据
                 const lfKeys = await localforage.keys();
                 for (const key of lfKeys) {
                     exportData.localforage[key] = await localforage.getItem(key);
                 }
+
+                // 读取localStorage兜底数据
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
                     exportData.localstorage[key] = localStorage.getItem(key);
                 }
+
+                // 读取自定义主题/图片数据库
                 if (db) {
                     await new Promise((resolve, reject) => {
                         const tx = db.transaction(storeName, "readonly");
@@ -63,18 +74,21 @@
                     });
                 }
 
+                // 生成下载文件流
                 const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
 
+                // 按钮状态更新
                 this.textContent = '打包完成，点击此处下载';
                 this.disabled = false;
                 this.style.opacity = '1';
                 this.style.background = '#ff9eaa';
                 this.style.color = '#fff';
 
+                // 触发下载，使用自定义文件名
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = formatBunnyExportFileName();
+                a.download = formatBunnyFileName();
                 a.style.display = 'none';
                 document.body.appendChild(a);
 
@@ -83,6 +97,7 @@
                 const downloadHandler = () => { a.click(); };
                 this.addEventListener('click', downloadHandler);
 
+                // 10秒后重置按钮，清理临时资源
                 setTimeout(() => {
                     this.textContent = originalText;
                     this.removeAttribute('data-download-url');
@@ -104,15 +119,15 @@
         return true;
     }
 
-    // 监听DOM加载，确保按钮出现后立即替换，彻底解决时序问题
+    // 双重兜底：页面加载完成后执行，同时开启DOM监听，确保按钮出现后立即替换
     const observer = new MutationObserver(() => {
         if (replaceExportLogic()) {
             observer.disconnect(); // 替换成功后停止监听
         }
     });
 
-    // 页面加载完成后立即执行，同时开启监听兜底
-    window.addEventListener('DOMContentLoaded', () => {
+    // 等页面所有资源、JS执行完成后再运行，彻底规避时序问题
+    window.addEventListener('load', () => {
         if (!replaceExportLogic()) {
             observer.observe(document.body, { childList: true, subtree: true });
         }
