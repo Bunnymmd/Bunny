@@ -3367,10 +3367,10 @@ ${specialInstructions}`;
             }
             if (parsedLines.length === 0) parsedLines.push({ type: 'text', content: replyText });
             
-            // 兜底长消息拆分机制：如果AI单条文本消息过长，强制按句子拆分，模拟真实聊天习惯
+                        // 兜底长消息拆分机制：强制按句子拆分，模拟真实聊天习惯
             let finalParsedLines = [];
             parsedLines.forEach(msg => {
-                if (msg.type === 'text' && msg.content.length > 40) {
+                if (msg.type === 'text') {
                     const sentences = msg.content.match(/[^。！？\n]+[。！？\n]*/g);
                     if (sentences && sentences.length > 1) {
                         sentences.forEach(s => {
@@ -3384,6 +3384,7 @@ ${specialInstructions}`;
                 }
             });
             parsedLines = finalParsedLines;
+
 
             for (let i = 0; i < parsedLines.length; i++) {
                 const msgObj = parsedLines[i];
